@@ -1,0 +1,11 @@
+{
+  "rulesDirectory": "../../../../rules",
+  "rules": {
+    "my-import-groups": [
+      true,
+      {
+        "alias-prefix": "@testAlias"
+      }
+    ]
+  }
+}

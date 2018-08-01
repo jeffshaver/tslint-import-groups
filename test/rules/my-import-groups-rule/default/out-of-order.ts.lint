@@ -1,0 +1,8 @@
+import myFunc from 'my-module'
+
+import myUtil from '../my-util'
+
+import myUtil2 from './my-util-2'
+
+import myUtil3 from 'my-module-3'
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ [Imports must be in the following order: node_modules, aliases, parentDirectory, currentDirectory]

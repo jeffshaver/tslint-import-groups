@@ -1,0 +1,8 @@
+import myFunc from 'my-module'
+
+import myFunc2 from '@testAlias'
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ [Imports of the same type must be grouped together]
+import myUtil from '../my-util'
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ [Rules of different groups must be separated by newlines]
+import myUtil2 from './my-util-2'
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ [Rules of different groups must be separated by newlines]

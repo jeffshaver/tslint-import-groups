@@ -1,0 +1,7 @@
+import myFunc from 'my-module'
+
+import myFunc2 from '@testAlias'
+
+import myUtil from '../my-util'
+
+import myUtil2 from './my-util-2'
