@@ -1,0 +1,6 @@
+{
+  "rulesDirectory": "../../../../rules",
+  "rules": {
+    "my-import-groups": [true]
+  }
+}

@@ -1,0 +1,5 @@
+import module from 'a-my-module'
+import module from 'my-module'
+
+import myFunc2 from './a-my-util'
+import myFunc from './my-util'

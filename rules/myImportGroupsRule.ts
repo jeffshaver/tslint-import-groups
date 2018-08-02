@@ -98,6 +98,8 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
       const nextModuleName = getModuleNameByNode(next)
       const nextImportGroupType = getGroupTypeByModuleName(nextModuleName)
 
+      // console.log(nextModuleName.localeCompare(importText))
+
       /**
        * If the current import and next import don't have the same group
        * then we need to add a failure because imports within the same group
@@ -108,6 +110,12 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
           next.getStart(),
           next.getStart() + next.getWidth(),
           Rule.SEPERATE_GROUPS_FAILURE
+        )
+      } else if (nextModuleName.localeCompare(importText) === -1) {
+        this.addFailure(
+          next.getStart(),
+          next.getStart() + next.getWidth(),
+          'Must be sorted alphabetically'
         )
       }
       // If there is a new line between this node and the next
