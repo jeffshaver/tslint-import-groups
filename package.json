@@ -4,8 +4,7 @@
   "main": "index.js",
   "license": "MIT",
   "scripts": {
-    "compile": "tsc rules/myImportGroupsRule.ts",
-    "lint": "tslint index.ts --config tslint.json",
+    "compile": "tsc",
     "test": "./scripts/run-tests.sh"
   },
   "dependencies": {

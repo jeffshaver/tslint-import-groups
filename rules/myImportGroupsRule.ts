@@ -42,12 +42,16 @@ const getGroupTypeByModuleName = (moduleName: string) => {
 const getModuleNameByNode = (node: ts.ImportDeclaration) =>
   node.moduleSpecifier.getText().replace(/'/g, '')
 
+const moduleIsAlphabeticallySorted = (
+  nextModuleName: string,
+  currentModuleName: string
+) => {
+  return currentModuleName.localeCompare(nextModuleName) === 1
+}
+
 // The walker takes care of all the work.
 class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
-  groupIndex = 0
-  firstImportGroupType: string
   currentImportGroupType: string
-  importGroups = new Set()
 
   constructor(sourceFile, ruleName, options) {
     super(sourceFile, ruleName, options)
@@ -74,8 +78,8 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
 
   public visitImportDeclaration(node: ts.ImportDeclaration) {
     const { sourceFile } = this
-    const importText = getModuleNameByNode(node)
-    const importGroupType = getGroupTypeByModuleName(importText)
+    const moduleName = getModuleNameByNode(node)
+    const importGroupType = getGroupTypeByModuleName(moduleName)
     const next = getNextStatement(node)
 
     if (!next) {
@@ -98,8 +102,6 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
       const nextModuleName = getModuleNameByNode(next)
       const nextImportGroupType = getGroupTypeByModuleName(nextModuleName)
 
-      // console.log(nextModuleName.localeCompare(importText))
-
       /**
        * If the current import and next import don't have the same group
        * then we need to add a failure because imports within the same group
@@ -111,7 +113,7 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
           next.getStart() + next.getWidth(),
           Rule.SEPERATE_GROUPS_FAILURE
         )
-      } else if (nextModuleName.localeCompare(importText) === -1) {
+      } else if (!moduleIsAlphabeticallySorted(moduleName, nextModuleName)) {
         this.addFailure(
           next.getStart(),
           next.getStart() + next.getWidth(),

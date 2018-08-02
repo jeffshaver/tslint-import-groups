@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "rootDir": "rules",
     "target": "es5",
     "lib": ["es5", "es6", "dom"],
     "module": "commonjs",
