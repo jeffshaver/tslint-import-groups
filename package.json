@@ -1,7 +1,7 @@
 {
   "name": "tslint-rule-test",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "tslint-import-groups.json",
   "license": "MIT",
   "scripts": {
     "compile": "tsc",
