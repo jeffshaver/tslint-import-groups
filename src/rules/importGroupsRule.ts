@@ -10,7 +10,7 @@ interface IJsonOptions {
   'alias-prefix': string
 }
 
-const importGroups = ['module', '../', './']
+const defaultImportGroups = ['module', '../', './']
 
 export class Rule extends Lint.Rules.AbstractRule {
   public static GROUP_OUT_OF_ORDER_STRING =
@@ -31,14 +31,6 @@ export class Rule extends Lint.Rules.AbstractRule {
   }
 }
 
-const getGroupTypeByModuleName = (moduleName: string) => {
-  for (let group of importGroups.reverse()) {
-    if (moduleName.startsWith(group)) {
-      return group
-    }
-  }
-}
-
 const getModuleNameByNode = (node: ts.ImportDeclaration) =>
   node.moduleSpecifier.getText().replace(/'/g, '')
 
@@ -52,9 +44,12 @@ const moduleIsAlphabeticallySorted = (
 // The walker takes care of all the work.
 class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
   currentImportGroupType: string
+  importGroups: string[]
 
   constructor(sourceFile, ruleName, options) {
     super(sourceFile, ruleName, options)
+
+    const importGroups = [...defaultImportGroups]
 
     /**
      * If the developer passed in an alias prefix,
@@ -63,6 +58,8 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
     if (options.aliasPrefix) {
       importGroups.splice(1, 0, options.aliasPrefix)
     }
+
+    this.importGroups = importGroups
   }
 
   public walk(sourceFile: ts.SourceFile) {
@@ -79,7 +76,7 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
   public visitImportDeclaration(node: ts.ImportDeclaration) {
     const { sourceFile } = this
     const moduleName = getModuleNameByNode(node)
-    const importGroupType = getGroupTypeByModuleName(moduleName)
+    const importGroupType = this.getGroupTypeByModuleName(moduleName)
     const next = getNextStatement(node)
 
     if (!next) {
@@ -100,7 +97,7 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
       }
 
       const nextModuleName = getModuleNameByNode(next)
-      const nextImportGroupType = getGroupTypeByModuleName(nextModuleName)
+      const nextImportGroupType = this.getGroupTypeByModuleName(nextModuleName)
 
       /**
        * If the current import and next import don't have the same group
@@ -128,7 +125,7 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
       }
 
       const nextModuleText = next.moduleSpecifier.getText().replace(/'/g, '')
-      const nextGroupType = getGroupTypeByModuleName(nextModuleText)
+      const nextGroupType = this.getGroupTypeByModuleName(nextModuleText)
 
       /**
        * If the current import and the next import are of the same group,
@@ -147,14 +144,22 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
          * than the order is messed up
          */
       } else if (
-        importGroups.indexOf(nextGroupType) <
-        importGroups.indexOf(importGroupType)
+        this.importGroups.indexOf(nextGroupType) <
+        this.importGroups.indexOf(importGroupType)
       ) {
         this.addFailure(
           next.getStart(),
           next.getStart() + next.getWidth(),
           Rule.GROUP_OUT_OF_ORDER_STRING
         )
+      }
+    }
+  }
+
+  getGroupTypeByModuleName = (moduleName: string) => {
+    for (let group of this.importGroups.reverse()) {
+      if (moduleName.startsWith(group)) {
+        return group
       }
     }
   }

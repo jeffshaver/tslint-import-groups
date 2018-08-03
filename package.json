@@ -1,5 +1,5 @@
 {
-  "name": "tslint-rule-test",
+  "name": "tslint-import-groups",
   "version": "1.0.0",
   "main": "tslint-import-groups.json",
   "license": "MIT",
