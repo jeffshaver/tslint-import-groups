@@ -1,7 +1,7 @@
 {
   "rulesDirectory": "../../../../dist/rules",
   "rules": {
-    "my-import-groups": [
+    "import-groups": [
       true,
       {
         "alias-prefix": "@testAlias"
