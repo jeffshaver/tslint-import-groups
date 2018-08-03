@@ -5,6 +5,7 @@
   "license": "MIT",
   "scripts": {
     "compile": "tsc",
+    "prepublish": "yarn run compile",
     "test": "./scripts/run-tests.sh"
   },
   "dependencies": {
