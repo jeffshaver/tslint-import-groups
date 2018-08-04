@@ -4,7 +4,7 @@
     "import-groups": [
       true,
       {
-        "alias-prefix": "@testAlias"
+        "aliases": ["@testAlias", "@testAlias2"]
       }
     ]
   }

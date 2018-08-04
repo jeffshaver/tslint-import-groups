@@ -1,0 +1,2 @@
+import myAliasFunc from '@testAlias/myAliasFunc'
+import myFunc from '@testAlias/myFunc'

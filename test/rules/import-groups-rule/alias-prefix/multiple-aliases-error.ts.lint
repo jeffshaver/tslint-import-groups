@@ -1,0 +1,5 @@
+import myFunc from '@testAlias2'
+import myFunc from '@testAlias'
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ [alphabetical]
+
+[alphabetical]: Must be sorted alphabetically

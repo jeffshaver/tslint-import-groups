@@ -3,16 +3,18 @@ import * as Lint from 'tslint'
 import { getNextStatement, isImportDeclaration } from 'tsutils'
 
 interface IOptions {
-  aliasPrefix: string
+  aliases: string[]
 }
 
 interface IJsonOptions {
-  'alias-prefix': string
+  aliases: string[]
 }
 
-const defaultImportGroups = ['module', '../', './']
+const moduleGroups = ['node_module', 'alias', '../', './']
+const reversedModuleGroups = [...moduleGroups].reverse()
 
 export class Rule extends Lint.Rules.AbstractRule {
+  public static ALPHABETICAL_ERROR = 'Must be sorted alphabetically'
   public static GROUP_OUT_OF_ORDER_STRING =
     'Imports must be in the following order: node_modules, aliases, parentDirectory, currentDirectory'
   public static SAME_GROUP_FAILURE =
@@ -31,35 +33,22 @@ export class Rule extends Lint.Rules.AbstractRule {
   }
 }
 
-const getModuleNameByNode = (node: ts.ImportDeclaration) =>
+const getModulePathByNode = (node: ts.ImportDeclaration) =>
   node.moduleSpecifier.getText().replace(/'/g, '')
-
-const moduleIsAlphabeticallySorted = (
-  nextModuleName: string,
-  currentModuleName: string
-) => {
-  return currentModuleName.localeCompare(nextModuleName) === 1
+const getModuleNameFromPath = (modulePath: string) => {
+  return modulePath.substring(modulePath.lastIndexOf('/') + 1)
 }
 
 // The walker takes care of all the work.
 class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
-  currentImportGroupType: string
-  importGroups: string[]
+  currentModuleGroupType: string
+  moduleGroups: string[]
+  options: IOptions
 
-  constructor(sourceFile, ruleName, options) {
+  constructor(sourceFile: ts.SourceFile, ruleName: string, options: IOptions) {
     super(sourceFile, ruleName, options)
 
-    const importGroups = [...defaultImportGroups]
-
-    /**
-     * If the developer passed in an alias prefix,
-     * splice that into the available group types array
-     */
-    if (options.aliasPrefix) {
-      importGroups.splice(1, 0, options.aliasPrefix)
-    }
-
-    this.importGroups = importGroups
+    this.options = options
   }
 
   public walk(sourceFile: ts.SourceFile) {
@@ -75,8 +64,8 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
 
   public visitImportDeclaration(node: ts.ImportDeclaration) {
     const { sourceFile } = this
-    const moduleName = getModuleNameByNode(node)
-    const importGroupType = this.getGroupTypeByModuleName(moduleName)
+    const modulePath = getModulePathByNode(node)
+    const moduleGroupType = this.getGroupTypeByModulePath(modulePath)
     const next = getNextStatement(node)
 
     if (!next) {
@@ -87,7 +76,7 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
     const line = ts.getLineAndCharacterOfPosition(sourceFile, start).line
     const nextLine = ts.getLineAndCharacterOfPosition(sourceFile, next.end).line
 
-    this.currentImportGroupType = importGroupType
+    this.currentModuleGroupType = moduleGroupType
 
     // If the next statement is on the line right below the current
     if (nextLine - line === 1) {
@@ -96,25 +85,31 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
         return
       }
 
-      const nextModuleName = getModuleNameByNode(next)
-      const nextImportGroupType = this.getGroupTypeByModuleName(nextModuleName)
+      const nextModulePath = getModulePathByNode(next)
+      const nextModuleGroupType = this.getGroupTypeByModulePath(nextModulePath)
 
       /**
-       * If the current import and next import don't have the same group
-       * then we need to add a failure because imports within the same group
+       * If the current module and next module don't have the same group
+       * then we need to add a failure because modules within the same group
        * (not separated by newlines) must be in the same group
        */
-      if (nextImportGroupType !== this.currentImportGroupType) {
+      if (nextModuleGroupType !== this.currentModuleGroupType) {
         this.addFailure(
           next.getStart(),
           next.getStart() + next.getWidth(),
           Rule.SEPERATE_GROUPS_FAILURE
         )
-      } else if (!moduleIsAlphabeticallySorted(moduleName, nextModuleName)) {
+      } else if (
+        /**
+         * If the next module comes alphabetically after
+         * the current module, than there is an error
+         */
+        !this.moduleIsAlphabeticallySorted(nextModulePath, modulePath)
+      ) {
         this.addFailure(
           next.getStart(),
           next.getStart() + next.getWidth(),
-          'Must be sorted alphabetically'
+          Rule.ALPHABETICAL_ERROR
         )
       }
       // If there is a new line between this node and the next
@@ -125,14 +120,14 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
       }
 
       const nextModuleText = next.moduleSpecifier.getText().replace(/'/g, '')
-      const nextGroupType = this.getGroupTypeByModuleName(nextModuleText)
+      const nextGroupType = this.getGroupTypeByModulePath(nextModuleText)
 
       /**
-       * If the current import and the next import are of the same group,
-       * we need to add a failure because imports of the same group
+       * If the current module and the next module are of the same group,
+       * we need to add a failure because modules of the same group
        * must be in the same group (not separated by a newline)
        */
-      if (nextGroupType === this.currentImportGroupType) {
+      if (nextGroupType === this.currentModuleGroupType) {
         this.addFailure(
           next.getStart(),
           next.getStart() + next.getWidth(),
@@ -140,12 +135,12 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
         )
         /**
          * Import groups must be in the right order. So if the index
-         * of the nextimport group is before the current import group,
+         * of the current module group is after the next module group,
          * than the order is messed up
          */
       } else if (
-        this.importGroups.indexOf(nextGroupType) <
-        this.importGroups.indexOf(importGroupType)
+        moduleGroups.indexOf(moduleGroupType) >
+        moduleGroups.indexOf(nextGroupType)
       ) {
         this.addFailure(
           next.getStart(),
@@ -156,17 +151,74 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
     }
   }
 
-  getGroupTypeByModuleName = (moduleName: string) => {
-    for (let group of this.importGroups.reverse()) {
-      if (moduleName.startsWith(group)) {
+  getGroupTypeByModulePath = (modulePath: string): string => {
+    for (let group of reversedModuleGroups) {
+      if (group === 'alias' && this.options.aliases) {
+        const alias = this.options.aliases.find(alias =>
+          modulePath.startsWith(alias)
+        )
+
+        if (!alias) {
+          continue
+        }
+
+        return group
+      }
+
+      if (modulePath.startsWith(group)) {
         return group
       }
     }
+
+    return 'node_module'
+  }
+
+  // Pulls out the first part of the module path
+  getNodeModuleOrAliasNameFromPath = nodeModuleOrAliasPath => {
+    const firstSeparatorIndex = nodeModuleOrAliasPath.indexOf('/')
+
+    return nodeModuleOrAliasPath.substring(
+      0,
+      firstSeparatorIndex === -1 ? undefined : firstSeparatorIndex
+    )
+  }
+
+  stringIsAfter = (string1: string, string2: string) => {
+    return (
+      getModuleNameFromPath(string1).localeCompare(
+        getModuleNameFromPath(string2)
+      ) === 1
+    )
+  }
+
+  moduleIsAlphabeticallySorted = (
+    nextModulePath: string,
+    currentModulePath: string
+  ): boolean => {
+    const groupType = this.getGroupTypeByModulePath(currentModulePath)
+
+    if (groupType === 'node_module' || groupType === 'alias') {
+      const currentNodeModuleOrAliasName = this.getNodeModuleOrAliasNameFromPath(
+        currentModulePath
+      )
+      const nextNodeModuleOrAliasName = this.getNodeModuleOrAliasNameFromPath(
+        nextModulePath
+      )
+
+      if (currentNodeModuleOrAliasName !== nextNodeModuleOrAliasName) {
+        return this.stringIsAfter(
+          nextNodeModuleOrAliasName,
+          currentNodeModuleOrAliasName
+        )
+      }
+    }
+
+    return this.stringIsAfter(nextModulePath, currentModulePath)
   }
 }
 
 const defaultOptions: IOptions = {
-  aliasPrefix: undefined
+  aliases: undefined
 }
 
 function parseOptions(ruleArguments: any[]): IOptions {
@@ -177,6 +229,6 @@ function parseOptions(ruleArguments: any[]): IOptions {
   }
 
   return {
-    aliasPrefix: options['alias-prefix']
+    aliases: options['aliases']
   }
 }

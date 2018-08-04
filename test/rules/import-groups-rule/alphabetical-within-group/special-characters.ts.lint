@@ -1,0 +1,13 @@
+import module from 'a-my-module'
+import module from '@my-module/b-module'
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ [alphabetically]
+import module from '@my-module/a-module'
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ [alphabetically]
+import module from '@my-module/d-module'
+import module from '@my-module-2/c-module'
+
+import myFunc from './my-util'
+import myFunc2 from './a-my-util'
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ [alphabetically]
+
+[alphabetically]: Must be sorted alphabetically
