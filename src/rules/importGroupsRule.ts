@@ -34,8 +34,10 @@ export class Rule extends Lint.Rules.AbstractRule {
   }
 }
 
-const getModulePathByNode = (node: ts.ImportDeclaration) =>
-  node.moduleSpecifier.getText().replace(/'/g, '')
+const getModulePathByNode = (
+  node: ts.ImportDeclaration,
+  sourceFile: ts.SourceFile
+) => node.moduleSpecifier.getText(sourceFile).replace(/'/g, '')
 const getModuleNameFromPath = (modulePath: string) => {
   return modulePath.substring(modulePath.lastIndexOf('/') + 1)
 }
@@ -65,7 +67,7 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
 
   public visitImportDeclaration(node: ts.ImportDeclaration) {
     const { sourceFile } = this
-    const modulePath = getModulePathByNode(node)
+    const modulePath = getModulePathByNode(node, sourceFile)
     const moduleGroupType = this.getGroupTypeByModulePath(modulePath)
     const next = getNextStatement(node)
 
@@ -73,20 +75,31 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
       return
     }
 
-    const start = node.getStart(sourceFile)
-    const line = ts.getLineAndCharacterOfPosition(sourceFile, start).line
-    const nextLine = ts.getLineAndCharacterOfPosition(sourceFile, next.end).line
+    // Get info about the current node
+    const nodeStart = node.getStart(sourceFile)
+    const nodeLine = ts.getLineAndCharacterOfPosition(sourceFile, nodeStart)
+      .line
+    const nodeText = node.getText(sourceFile)
+    const nodeWidth = node.getWidth(sourceFile)
+    // Get info about the next node
+    const nextNodeStart = next.getStart(sourceFile)
+    const nextNodeLine = ts.getLineAndCharacterOfPosition(
+      sourceFile,
+      next.getEnd()
+    ).line
+    const nextNodeText = next.getText(sourceFile)
+    const nextNodeWidth = next.getWidth(sourceFile)
 
     this.currentModuleGroupType = moduleGroupType
 
     // If the next statement is on the line right below the current
-    if (nextLine - line === 1) {
+    if (nextNodeLine - nodeLine === 1) {
       // If the next node isn't an import, just return
       if (!isImportDeclaration(next)) {
         return
       }
 
-      const nextModulePath = getModulePathByNode(next)
+      const nextModulePath = getModulePathByNode(next, sourceFile)
       const nextModuleGroupType = this.getGroupTypeByModulePath(nextModulePath)
 
       /**
@@ -96,15 +109,15 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
        */
       if (nextModuleGroupType !== this.currentModuleGroupType) {
         this.addFailure(
-          next.getStart(),
+          nextNodeStart,
           next.getEnd(),
           Rule.SEPERATE_GROUPS_FAILURE,
           [
             // Add a newline before the import that should be in the next group
             new Lint.Replacement(
-              next.getStart(),
-              next.getWidth(),
-              `\n${next.getText()}`
+              nextNodeStart,
+              nextNodeWidth,
+              `\n${nextNodeText}`
             )
           ]
         )
@@ -115,34 +128,21 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
          */
         !this.moduleIsAlphabeticallySorted(nextModulePath, modulePath)
       ) {
-        this.addFailure(
-          next.getStart(),
-          next.getEnd(),
-          Rule.ALPHABETICAL_ERROR,
-          [
-            // Replace the current line with the next one
-            new Lint.Replacement(
-              node.getStart(),
-              node.getWidth(),
-              next.getText()
-            ),
-            // Replace the next line with the current one
-            new Lint.Replacement(
-              next.getStart(),
-              next.getWidth(),
-              node.getText()
-            )
-          ]
-        )
+        this.addFailure(nextNodeStart, next.getEnd(), Rule.ALPHABETICAL_ERROR, [
+          // Replace the current line with the next one
+          new Lint.Replacement(nodeStart, nodeWidth, nextNodeText),
+          // Replace the next line with the current one
+          new Lint.Replacement(nextNodeStart, nextNodeWidth, nodeText)
+        ])
       }
       // If there is a new line between this node and the next
-    } else if (nextLine - line > 1) {
+    } else if (nextNodeLine - nodeLine > 1) {
       // If the next node isn't an import declaration, just return
       if (!isImportDeclaration(next)) {
         return
       }
 
-      const nextModuleText = next.moduleSpecifier.getText().replace(/'/g, '')
+      const nextModuleText = getModulePathByNode(next, sourceFile)
       const nextGroupType = this.getGroupTypeByModulePath(nextModuleText)
 
       /**
@@ -151,19 +151,14 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
        * must be in the same group (not separated by a newline)
        */
       if (nextGroupType === this.currentModuleGroupType) {
-        this.addFailure(
-          next.getStart(),
-          next.getEnd(),
-          Rule.SAME_GROUP_FAILURE,
-          [
-            // Remove the newline from before the current line
-            new Lint.Replacement(
-              next.getStart() - 1,
-              next.getWidth() + 1,
-              next.getText()
-            )
-          ]
-        )
+        this.addFailure(nextNodeStart, next.getEnd(), Rule.SAME_GROUP_FAILURE, [
+          // Remove the newline from before the current line
+          new Lint.Replacement(
+            nextNodeStart - 1,
+            nextNodeWidth + 1,
+            nextNodeText
+          )
+        ])
         /**
          * Import groups must be in the right order. So if the index
          * of the current module group is after the next module group,
@@ -174,22 +169,14 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
         moduleGroups.indexOf(nextGroupType)
       ) {
         this.addFailure(
-          next.getStart(),
+          nextNodeStart,
           next.getEnd(),
           Rule.GROUP_OUT_OF_ORDER_STRING,
           [
             // Replace the current line with the next one
-            new Lint.Replacement(
-              node.getStart(),
-              node.getWidth(),
-              next.getText()
-            ),
+            new Lint.Replacement(nodeStart, nodeWidth, nextNodeText),
             // Replace the next line with the current one
-            new Lint.Replacement(
-              next.getStart(),
-              next.getWidth(),
-              node.getText()
-            )
+            new Lint.Replacement(nextNodeStart, nextNodeWidth, nodeText)
           ]
         )
       }
