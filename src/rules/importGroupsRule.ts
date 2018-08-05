@@ -77,7 +77,7 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
 
     // Get info about the current node
     const nodeStart = node.getStart(sourceFile)
-    const nodeLine = ts.getLineAndCharacterOfPosition(sourceFile, nodeStart)
+    const nodeLine = ts.getLineAndCharacterOfPosition(sourceFile, node.getEnd())
       .line
     const nodeText = node.getText(sourceFile)
     const nodeWidth = node.getWidth(sourceFile)
@@ -85,7 +85,7 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
     const nextNodeStart = next.getStart(sourceFile)
     const nextNodeLine = ts.getLineAndCharacterOfPosition(
       sourceFile,
-      next.getEnd()
+      nextNodeStart
     ).line
     const nextNodeText = next.getText(sourceFile)
     const nextNodeWidth = next.getWidth(sourceFile)

@@ -1,0 +1,14 @@
+import {
+  myFuncA,
+  myFuncB
+} from 'my-module'
+import {
+~~~~~~~~
+  myFuncC,
+~~~~~~~~~~
+  myFuncD,
+~~~~~~~~~~
+} from '../my-parent-module'
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~ [different-groups]
+
+[different-groups]: Imports of different groups must be separated by newlines
