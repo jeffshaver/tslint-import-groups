@@ -97,7 +97,7 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
       if (nextModuleGroupType !== this.currentModuleGroupType) {
         this.addFailure(
           next.getStart(),
-          next.getStart() + next.getWidth(),
+          next.getEnd(),
           Rule.SEPERATE_GROUPS_FAILURE,
           [
             // Add a newline before the import that should be in the next group
@@ -117,7 +117,7 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
       ) {
         this.addFailure(
           next.getStart(),
-          next.getStart() + next.getWidth(),
+          next.getEnd(),
           Rule.ALPHABETICAL_ERROR,
           [
             // Replace the current line with the next one
@@ -153,7 +153,7 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
       if (nextGroupType === this.currentModuleGroupType) {
         this.addFailure(
           next.getStart(),
-          next.getStart() + next.getWidth(),
+          next.getEnd(),
           Rule.SAME_GROUP_FAILURE,
           [
             // Remove the newline from before the current line
@@ -175,7 +175,7 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
       ) {
         this.addFailure(
           next.getStart(),
-          next.getStart() + next.getWidth(),
+          next.getEnd(),
           Rule.GROUP_OUT_OF_ORDER_STRING,
           [
             // Replace the current line with the next one
