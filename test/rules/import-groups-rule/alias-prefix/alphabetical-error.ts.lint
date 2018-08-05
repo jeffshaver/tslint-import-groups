@@ -2,4 +2,4 @@ import myFunc from '@testAlias/myFunc'
 import myAliasFunc from '@testAlias/myAliasFunc'
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ [alphabetically]
 
-[alphabetically]: Must be sorted alphabetically
+[alphabetically]: Imports must be sorted alphabetically, by node_module/alias and by module name

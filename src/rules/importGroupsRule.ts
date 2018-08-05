@@ -14,7 +14,8 @@ const moduleGroups = ['node_module', 'alias', '../', './']
 const reversedModuleGroups = [...moduleGroups].reverse()
 
 export class Rule extends Lint.Rules.AbstractRule {
-  public static ALPHABETICAL_ERROR = 'Must be sorted alphabetically'
+  public static ALPHABETICAL_ERROR =
+    'Imports must be sorted alphabetically, by node_module/alias and by module name'
   public static GROUP_OUT_OF_ORDER_STRING =
     'Imports must be in the following order: node_modules, aliases, parentDirectory, currentDirectory'
   public static SAME_GROUP_FAILURE =
@@ -97,7 +98,15 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
         this.addFailure(
           next.getStart(),
           next.getStart() + next.getWidth(),
-          Rule.SEPERATE_GROUPS_FAILURE
+          Rule.SEPERATE_GROUPS_FAILURE,
+          [
+            // Add a newline before the import that should be in the next group
+            new Lint.Replacement(
+              next.getStart(),
+              next.getWidth(),
+              `\n${next.getText()}`
+            )
+          ]
         )
       } else if (
         /**
@@ -109,7 +118,21 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
         this.addFailure(
           next.getStart(),
           next.getStart() + next.getWidth(),
-          Rule.ALPHABETICAL_ERROR
+          Rule.ALPHABETICAL_ERROR,
+          [
+            // Replace the current line with the next one
+            new Lint.Replacement(
+              node.getStart(),
+              node.getWidth(),
+              next.getText()
+            ),
+            // Replace the next line with the current one
+            new Lint.Replacement(
+              next.getStart(),
+              next.getWidth(),
+              node.getText()
+            )
+          ]
         )
       }
       // If there is a new line between this node and the next
@@ -131,7 +154,15 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
         this.addFailure(
           next.getStart(),
           next.getStart() + next.getWidth(),
-          Rule.SAME_GROUP_FAILURE
+          Rule.SAME_GROUP_FAILURE,
+          [
+            // Remove the newline from before the current line
+            new Lint.Replacement(
+              next.getStart() - 1,
+              next.getWidth() + 1,
+              next.getText()
+            )
+          ]
         )
         /**
          * Import groups must be in the right order. So if the index
@@ -145,7 +176,21 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
         this.addFailure(
           next.getStart(),
           next.getStart() + next.getWidth(),
-          Rule.GROUP_OUT_OF_ORDER_STRING
+          Rule.GROUP_OUT_OF_ORDER_STRING,
+          [
+            // Replace the current line with the next one
+            new Lint.Replacement(
+              node.getStart(),
+              node.getWidth(),
+              next.getText()
+            ),
+            // Replace the next line with the current one
+            new Lint.Replacement(
+              next.getStart(),
+              next.getWidth(),
+              node.getText()
+            )
+          ]
         )
       }
     }

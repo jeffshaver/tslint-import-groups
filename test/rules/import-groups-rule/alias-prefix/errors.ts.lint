@@ -1,6 +1,7 @@
 import myFunc from 'my-module'
+import myFunc3 from '@test-alias-3/my-func-3'
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ [different-groups]
 import myFunc2 from '@testAlias'
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ [different-groups]
 import myUtil from '../my-util'
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ [different-groups]
 import myUtil2 from './my-util-2'

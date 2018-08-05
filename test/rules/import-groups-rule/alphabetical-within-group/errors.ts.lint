@@ -1,13 +1,13 @@
 import module from 'my-module'
 import module from 'a-my-module'
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ [alphabetically]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ [alphabetical]
 
 import myParentFunc from '../my-parent-util'
 import myParentFunc2 from '../../my-parent-util'
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ [alphabetically]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ [alphabetical]
 
 import myFunc from './my-util'
 import myFunc2 from './a-my-util'
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ [alphabetically]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ [alphabetical]
 
-[alphabetically]: Must be sorted alphabetically
+[alphabetical]: Imports must be sorted alphabetically, by node_module/alias and by module name
