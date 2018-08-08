@@ -12,6 +12,10 @@ interface IJsonOptions {
 
 const moduleGroups = ['node_module', 'alias', '../', './']
 const reversedModuleGroups = [...moduleGroups].reverse()
+const moduleGroupNameMap = {
+  '../': 'parentDirectory',
+  './': 'currentDirectory'
+}
 
 export class Rule extends Lint.Rules.AbstractRule {
   public static ALPHABETICAL_ERROR =
@@ -45,7 +49,8 @@ const getModuleNameFromPath = (modulePath: string) => {
 // The walker takes care of all the work.
 class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
   currentModuleGroupType: string
-  moduleGroups: string[]
+  fix: Lint.Replacement
+  importDeclarations: ts.ImportDeclaration[] = []
   options: IOptions
 
   constructor(sourceFile: ts.SourceFile, ruleName: string, options: IOptions) {
@@ -62,10 +67,70 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
 
       return ts.forEachChild(node, cb)
     }
-    return ts.forEachChild(sourceFile, cb)
+    ts.forEachChild(sourceFile, cb)
+
+    this.createFix()
+
+    this.importDeclarations.forEach(importDeclaration => {
+      this.createFailure(importDeclaration)
+    })
+  }
+
+  createFix() {
+    const { sourceFile } = this
+    const importsGrouped = {
+      alias: [],
+      currentDirectory: [],
+      node_module: [],
+      parentDirectory: []
+    }
+
+    /**
+     * For each of the original import declarations, we need to
+     * group them into their module groups
+     */
+    this.importDeclarations.forEach(importDeclaration => {
+      const modulePath = getModulePathByNode(importDeclaration, sourceFile)
+      const groupType = this.getGroupTypeByModulePath(modulePath)
+      const groupTypeName = moduleGroupNameMap[groupType] || groupType
+
+      importsGrouped[groupTypeName].push(importDeclaration)
+    })
+
+    // Sort each module group
+    Object.keys(importsGrouped).forEach(importGroupKey => {
+      importsGrouped[importGroupKey] = importsGrouped[importGroupKey].sort(
+        (a, b) => {
+          return this.getSortDirection(a, b)
+        }
+      )
+    })
+
+    // util
+    const getFullText = (node: ts.ImportDeclaration) => node.getText()
+
+    /**
+     * Creates a fix that replaces everything from the start of
+     * the first import to the end of the last import with
+     * the newly grouped and sorted imports
+     */
+    this.fix = new Lint.Replacement(
+      this.importDeclarations[0].getStart(),
+      this.importDeclarations[this.importDeclarations.length - 1].getEnd(),
+      [
+        importsGrouped.node_module.map(getFullText).join('\n'),
+        importsGrouped.alias.map(getFullText).join('\n'),
+        importsGrouped.parentDirectory.map(getFullText).join('\n'),
+        importsGrouped.currentDirectory.map(getFullText).join('\n')
+      ].join('\n\n')
+    )
   }
 
   public visitImportDeclaration(node: ts.ImportDeclaration) {
+    this.importDeclarations.push(node)
+  }
+
+  public createFailure(node: ts.ImportDeclaration) {
     const { sourceFile } = this
     const modulePath = getModulePathByNode(node, sourceFile)
     const moduleGroupType = this.getGroupTypeByModulePath(modulePath)
@@ -76,19 +141,14 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
     }
 
     // Get info about the current node
-    const nodeStart = node.getStart(sourceFile)
     const nodeLine = ts.getLineAndCharacterOfPosition(sourceFile, node.getEnd())
       .line
-    const nodeText = node.getText(sourceFile)
-    const nodeWidth = node.getWidth(sourceFile)
     // Get info about the next node
     const nextNodeStart = next.getStart(sourceFile)
     const nextNodeLine = ts.getLineAndCharacterOfPosition(
       sourceFile,
       nextNodeStart
     ).line
-    const nextNodeText = next.getText(sourceFile)
-    const nextNodeWidth = next.getWidth(sourceFile)
 
     this.currentModuleGroupType = moduleGroupType
 
@@ -112,28 +172,21 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
           nextNodeStart,
           next.getEnd(),
           Rule.SEPERATE_GROUPS_FAILURE,
-          [
-            // Add a newline before the import that should be in the next group
-            new Lint.Replacement(
-              nextNodeStart,
-              nextNodeWidth,
-              `\n${nextNodeText}`
-            )
-          ]
+          this.fix
         )
       } else if (
         /**
          * If the next module comes alphabetically after
          * the current module, than there is an error
          */
-        !this.moduleIsAlphabeticallySorted(nextModulePath, modulePath)
+        !this.moduleIsAlphabeticallySorted(next, node)
       ) {
-        this.addFailure(nextNodeStart, next.getEnd(), Rule.ALPHABETICAL_ERROR, [
-          // Replace the current line with the next one
-          new Lint.Replacement(nodeStart, nodeWidth, nextNodeText),
-          // Replace the next line with the current one
-          new Lint.Replacement(nextNodeStart, nextNodeWidth, nodeText)
-        ])
+        this.addFailure(
+          nextNodeStart,
+          next.getEnd(),
+          Rule.ALPHABETICAL_ERROR,
+          this.fix
+        )
       }
       // If there is a new line between this node and the next
     } else if (nextNodeLine - nodeLine > 1) {
@@ -151,14 +204,12 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
        * must be in the same group (not separated by a newline)
        */
       if (nextGroupType === this.currentModuleGroupType) {
-        this.addFailure(nextNodeStart, next.getEnd(), Rule.SAME_GROUP_FAILURE, [
-          // Remove the newline from before the current line
-          new Lint.Replacement(
-            nextNodeStart - 1,
-            nextNodeWidth + 1,
-            nextNodeText
-          )
-        ])
+        this.addFailure(
+          nextNodeStart,
+          next.getEnd(),
+          Rule.SAME_GROUP_FAILURE,
+          this.fix
+        )
         /**
          * Import groups must be in the right order. So if the index
          * of the current module group is after the next module group,
@@ -172,12 +223,7 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
           nextNodeStart,
           next.getEnd(),
           Rule.GROUP_OUT_OF_ORDER_STRING,
-          [
-            // Replace the current line with the next one
-            new Lint.Replacement(nodeStart, nodeWidth, nextNodeText),
-            // Replace the next line with the current one
-            new Lint.Replacement(nextNodeStart, nextNodeWidth, nodeText)
-          ]
+          this.fix
         )
       }
     }
@@ -223,29 +269,44 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
     )
   }
 
-  moduleIsAlphabeticallySorted = (
-    nextModulePath: string,
-    currentModulePath: string
-  ): boolean => {
-    const groupType = this.getGroupTypeByModulePath(currentModulePath)
+  /**
+   * Given two import declarations, return a -1, 0 or 1 based on
+   * how the first import needs to move in order to be sorted correctly
+   */
+  getSortDirection = (a: ts.ImportDeclaration, b: ts.ImportDeclaration) => {
+    const { sourceFile } = this
+    const aPath = getModulePathByNode(a, sourceFile)
+    const bPath = getModulePathByNode(b, sourceFile)
+    const groupType = this.getGroupTypeByModulePath(aPath)
 
+    /**
+     * If we are dealing with a node module or alias, we need to
+     * check whether the node_module/alias are sorted alphabetically before
+     * checking whether or not they are sorted by module name
+     */
     if (groupType === 'node_module' || groupType === 'alias') {
       const currentNodeModuleOrAliasName = this.getNodeModuleOrAliasNameFromPath(
-        currentModulePath
+        aPath
       )
       const nextNodeModuleOrAliasName = this.getNodeModuleOrAliasNameFromPath(
-        nextModulePath
+        bPath
       )
 
       if (currentNodeModuleOrAliasName !== nextNodeModuleOrAliasName) {
-        return this.stringIsAfter(
-          nextNodeModuleOrAliasName,
+        return getModuleNameFromPath(
           currentNodeModuleOrAliasName
-        )
+        ).localeCompare(getModuleNameFromPath(nextNodeModuleOrAliasName))
       }
     }
 
-    return this.stringIsAfter(nextModulePath, currentModulePath)
+    return aPath.localeCompare(bPath)
+  }
+
+  moduleIsAlphabeticallySorted = (
+    nextModule: ts.ImportDeclaration,
+    currentModule: ts.ImportDeclaration
+  ): boolean => {
+    return this.getSortDirection(nextModule, currentModule) === 1
   }
 }
 
