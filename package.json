@@ -1,6 +1,6 @@
 {
   "name": "tslint-import-groups",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "main": "tslint-import-groups.json",
   "license": "MIT",
   "scripts": {
