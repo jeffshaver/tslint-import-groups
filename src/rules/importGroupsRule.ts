@@ -38,14 +38,6 @@ export class Rule extends Lint.Rules.AbstractRule {
   }
 }
 
-const getModulePathByNode = (
-  node: ts.ImportDeclaration,
-  sourceFile: ts.SourceFile
-) => node.moduleSpecifier.getText(sourceFile).replace(/'/g, '')
-const getModuleNameFromPath = (modulePath: string) => {
-  return modulePath.substring(modulePath.lastIndexOf('/') + 1)
-}
-
 // The walker takes care of all the work.
 class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
   currentModuleGroupType: string
@@ -69,11 +61,17 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
     }
     ts.forEachChild(sourceFile, cb)
 
-    this.createFix()
+    if (this.importDeclarations.length > 0) {
+      this.createFix()
+    }
 
     this.importDeclarations.forEach(importDeclaration => {
       this.createFailure(importDeclaration)
     })
+  }
+
+  public visitImportDeclaration(node: ts.ImportDeclaration) {
+    this.importDeclarations.push(node)
   }
 
   createFix() {
@@ -90,7 +88,7 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
      * group them into their module groups
      */
     this.importDeclarations.forEach(importDeclaration => {
-      const modulePath = getModulePathByNode(importDeclaration, sourceFile)
+      const modulePath = this.getModulePathByNode(importDeclaration, sourceFile)
       const groupType = this.getGroupTypeByModulePath(modulePath)
       const groupTypeName = moduleGroupNameMap[groupType] || groupType
 
@@ -106,9 +104,6 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
       )
     })
 
-    // util
-    const getFullText = (node: ts.ImportDeclaration) => node.getText()
-
     /**
      * Creates a fix that replaces everything from the start of
      * the first import to the end of the last import with
@@ -118,21 +113,17 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
       this.importDeclarations[0].getStart(),
       this.importDeclarations[this.importDeclarations.length - 1].getEnd(),
       [
-        importsGrouped.node_module.map(getFullText).join('\n'),
-        importsGrouped.alias.map(getFullText).join('\n'),
-        importsGrouped.parentDirectory.map(getFullText).join('\n'),
-        importsGrouped.currentDirectory.map(getFullText).join('\n')
+        importsGrouped.node_module.map(this.getFullText).join('\n'),
+        importsGrouped.alias.map(this.getFullText).join('\n'),
+        importsGrouped.parentDirectory.map(this.getFullText).join('\n'),
+        importsGrouped.currentDirectory.map(this.getFullText).join('\n')
       ].join('\n\n')
     )
   }
 
-  public visitImportDeclaration(node: ts.ImportDeclaration) {
-    this.importDeclarations.push(node)
-  }
-
   public createFailure(node: ts.ImportDeclaration) {
     const { sourceFile } = this
-    const modulePath = getModulePathByNode(node, sourceFile)
+    const modulePath = this.getModulePathByNode(node, sourceFile)
     const moduleGroupType = this.getGroupTypeByModulePath(modulePath)
     const next = getNextStatement(node)
 
@@ -159,7 +150,7 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
         return
       }
 
-      const nextModulePath = getModulePathByNode(next, sourceFile)
+      const nextModulePath = this.getModulePathByNode(next, sourceFile)
       const nextModuleGroupType = this.getGroupTypeByModulePath(nextModulePath)
 
       /**
@@ -195,7 +186,7 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
         return
       }
 
-      const nextModuleText = getModulePathByNode(next, sourceFile)
+      const nextModuleText = this.getModulePathByNode(next, sourceFile)
       const nextGroupType = this.getGroupTypeByModulePath(nextModuleText)
 
       /**
@@ -227,6 +218,17 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
         )
       }
     }
+  }
+
+  getFullText = (node: ts.ImportDeclaration) => node.getText()
+
+  getModulePathByNode = (
+    node: ts.ImportDeclaration,
+    sourceFile: ts.SourceFile
+  ) => node.moduleSpecifier.getText(sourceFile).replace(/'/g, '')
+
+  getModuleNameFromPath = (modulePath: string) => {
+    return modulePath.substring(modulePath.lastIndexOf('/') + 1)
   }
 
   getGroupTypeByModulePath = (modulePath: string): string => {
@@ -263,8 +265,8 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
 
   stringIsAfter = (string1: string, string2: string) => {
     return (
-      getModuleNameFromPath(string1).localeCompare(
-        getModuleNameFromPath(string2)
+      this.getModuleNameFromPath(string1).localeCompare(
+        this.getModuleNameFromPath(string2)
       ) === 1
     )
   }
@@ -275,8 +277,8 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
    */
   getSortDirection = (a: ts.ImportDeclaration, b: ts.ImportDeclaration) => {
     const { sourceFile } = this
-    const aPath = getModulePathByNode(a, sourceFile)
-    const bPath = getModulePathByNode(b, sourceFile)
+    const aPath = this.getModulePathByNode(a, sourceFile)
+    const bPath = this.getModulePathByNode(b, sourceFile)
     const groupType = this.getGroupTypeByModulePath(aPath)
 
     /**
@@ -293,9 +295,9 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
       )
 
       if (currentNodeModuleOrAliasName !== nextNodeModuleOrAliasName) {
-        return getModuleNameFromPath(
+        return this.getModuleNameFromPath(
           currentNodeModuleOrAliasName
-        ).localeCompare(getModuleNameFromPath(nextNodeModuleOrAliasName))
+        ).localeCompare(this.getModuleNameFromPath(nextNodeModuleOrAliasName))
       }
     }
 
