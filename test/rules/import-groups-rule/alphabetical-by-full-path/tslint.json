@@ -1,0 +1,11 @@
+{
+  "rulesDirectory": "../../../../dist/rules",
+  "rules": {
+    "import-groups": [
+      true,
+      {
+        "alphabetical-by-full-path": true
+      }
+    ]
+  }
+}

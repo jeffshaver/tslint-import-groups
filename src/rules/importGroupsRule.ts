@@ -4,10 +4,12 @@ import { getNextStatement, isImportDeclaration } from 'tsutils'
 
 interface IOptions {
   aliases: string[]
+  alphabeticalByFullPath: boolean
 }
 
 interface IJsonOptions {
   aliases: string[]
+  'alphabetical-by-full-path': boolean
 }
 
 const moduleGroups = ['node_module', 'alias', '../', './']
@@ -74,7 +76,7 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
     this.importDeclarations.push(node)
   }
 
-  createFix() {
+  private createFix() {
     const { sourceFile } = this
     const importsGrouped = {
       alias: [],
@@ -121,7 +123,7 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
     )
   }
 
-  public createFailure(node: ts.ImportDeclaration) {
+  private createFailure(node: ts.ImportDeclaration) {
     const { sourceFile } = this
     const modulePath = this.getModulePathByNode(node, sourceFile)
     const moduleGroupType = this.getGroupTypeByModulePath(modulePath)
@@ -167,10 +169,10 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
         )
       } else if (
         /**
-         * If the next module comes alphabetically after
-         * the current module, than there is an error
+         * If the current module comes alphabetically after
+         * the next module, than there is an error
          */
-        !this.moduleIsAlphabeticallySorted(next, node)
+        !this.moduleIsAlphabeticallySorted(node, next)
       ) {
         this.addFailure(
           nextNodeStart,
@@ -220,18 +222,18 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
     }
   }
 
-  getFullText = (node: ts.ImportDeclaration) => node.getText()
+  private getFullText = (node: ts.ImportDeclaration) => node.getText()
 
-  getModulePathByNode = (
+  private getModulePathByNode = (
     node: ts.ImportDeclaration,
     sourceFile: ts.SourceFile
   ) => node.moduleSpecifier.getText(sourceFile).replace(/'/g, '')
 
-  getModuleNameFromPath = (modulePath: string) => {
+  private getModuleNameFromPath = (modulePath: string) => {
     return modulePath.substring(modulePath.lastIndexOf('/') + 1)
   }
 
-  getGroupTypeByModulePath = (modulePath: string): string => {
+  private getGroupTypeByModulePath = (modulePath: string): string => {
     for (let group of reversedModuleGroups) {
       if (group === 'alias' && this.options.aliases) {
         const alias = this.options.aliases.find(alias =>
@@ -254,7 +256,7 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
   }
 
   // Pulls out the first part of the module path
-  getNodeModuleOrAliasNameFromPath = nodeModuleOrAliasPath => {
+  private getNodeModuleOrAliasNameFromPath = nodeModuleOrAliasPath => {
     const firstSeparatorIndex = nodeModuleOrAliasPath.indexOf('/')
 
     return nodeModuleOrAliasPath.substring(
@@ -263,20 +265,16 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
     )
   }
 
-  stringIsAfter = (string1: string, string2: string) => {
-    return (
-      this.getModuleNameFromPath(string1).localeCompare(
-        this.getModuleNameFromPath(string2)
-      ) === 1
-    )
-  }
-
   /**
    * Given two import declarations, return a -1, 0 or 1 based on
    * how the first import needs to move in order to be sorted correctly
    */
-  getSortDirection = (a: ts.ImportDeclaration, b: ts.ImportDeclaration) => {
+  private getSortDirection = (
+    a: ts.ImportDeclaration,
+    b: ts.ImportDeclaration
+  ) => {
     const { sourceFile } = this
+    const { alphabeticalByFullPath } = this.options
     const aPath = this.getModulePathByNode(a, sourceFile)
     const bPath = this.getModulePathByNode(b, sourceFile)
     const groupType = this.getGroupTypeByModulePath(aPath)
@@ -286,34 +284,41 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
      * check whether the node_module/alias are sorted alphabetically before
      * checking whether or not they are sorted by module name
      */
-    if (groupType === 'node_module' || groupType === 'alias') {
-      const currentNodeModuleOrAliasName = this.getNodeModuleOrAliasNameFromPath(
-        aPath
-      )
-      const nextNodeModuleOrAliasName = this.getNodeModuleOrAliasNameFromPath(
-        bPath
-      )
+    if (!alphabeticalByFullPath) {
+      if (groupType === 'node_module' || groupType === 'alias') {
+        const currentNodeModuleOrAliasName = this.getNodeModuleOrAliasNameFromPath(
+          aPath
+        )
+        const nextNodeModuleOrAliasName = this.getNodeModuleOrAliasNameFromPath(
+          bPath
+        )
 
-      if (currentNodeModuleOrAliasName !== nextNodeModuleOrAliasName) {
-        return this.getModuleNameFromPath(
-          currentNodeModuleOrAliasName
-        ).localeCompare(this.getModuleNameFromPath(nextNodeModuleOrAliasName))
+        if (currentNodeModuleOrAliasName !== nextNodeModuleOrAliasName) {
+          return currentNodeModuleOrAliasName.localeCompare(
+            nextNodeModuleOrAliasName
+          )
+        } else {
+          return this.getModuleNameFromPath(aPath).localeCompare(
+            this.getModuleNameFromPath(bPath)
+          )
+        }
       }
     }
 
     return aPath.localeCompare(bPath)
   }
 
-  moduleIsAlphabeticallySorted = (
+  private moduleIsAlphabeticallySorted = (
     nextModule: ts.ImportDeclaration,
     currentModule: ts.ImportDeclaration
   ): boolean => {
-    return this.getSortDirection(nextModule, currentModule) === 1
+    return this.getSortDirection(nextModule, currentModule) <= 0
   }
 }
 
 const defaultOptions: IOptions = {
-  aliases: undefined
+  aliases: undefined,
+  alphabeticalByFullPath: false
 }
 
 function parseOptions(ruleArguments: any[]): IOptions {
@@ -324,6 +329,7 @@ function parseOptions(ruleArguments: any[]): IOptions {
   }
 
   return {
-    aliases: options['aliases']
+    aliases: options.aliases,
+    alphabeticalByFullPath: options['alphabetical-by-full-path']
   }
 }

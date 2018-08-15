@@ -1,2 +1,12 @@
-import myAliasFunc from '@testAlias/myAliasFunc'
-import myFunc from '@testAlias/myFunc'
+import module from '@material-ui/core/AppBar'
+import module from '@material-ui/core/Toolbar'
+import module from '@material-ui/core/styles/withStyles'
+
+import module from '@testAlias/virtual/help'
+import module from '@testAlias/utils/help'
+import module from '@testAlias/utils/help2'
+import module from '@testAlias2/virtual/help'
+
+import module from '../my-module'
+
+import module from './my-module'

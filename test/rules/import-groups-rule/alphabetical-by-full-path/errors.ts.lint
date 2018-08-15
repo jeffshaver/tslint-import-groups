@@ -1,0 +1,6 @@
+import module from '@material-ui/core/AppBar'
+import module from '@material-ui/core/Toolbar'
+import module from '@material-ui/core/styles/withStyles'
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ [alphabetically]
+
+[alphabetically]: Imports must be sorted alphabetically, by node_module/alias and by module name
