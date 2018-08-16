@@ -119,7 +119,11 @@ class ImportGroupsWalker extends Lint.AbstractWalker<IOptions> {
         importsGrouped.alias.map(this.getFullText).join('\n'),
         importsGrouped.parentDirectory.map(this.getFullText).join('\n'),
         importsGrouped.currentDirectory.map(this.getFullText).join('\n')
-      ].join('\n\n')
+      ]
+        // If any of the groups are empty, filter them out
+        .filter(a => a !== '')
+        // Make sure there is a newline between groups
+        .join('\n\n')
     )
   }
 
